@@ -4,7 +4,7 @@
 #include <WiFiEspServer.h>
 #include <DHT.h>
 #include "DFRobot_PH.h"
-#include "DFRobot_EC.h"
+#include "DFRobot_EC10.h"
 
 // WiFi network settings
 char ssid[] = "SmartHydro";       // newtork SSID (name). 8 or more characters
@@ -19,12 +19,19 @@ RingBuffer buf(8);
 #define PH_PIN A9
 #define EC_PIN A8
 #define FLOW_PIN A3
-
 #define DHTTYPE DHT22
+#define LED_PIN 4
+#define FAN_PIN 5
+#define PUMP_PIN 6
+#define EXTRACTOR_PIN 7
+
+
 DFRobot_PH ph;
 DHT dht = DHT(DHT_PIN, DHTTYPE);
 
-DFRobot_EC ec;
+DFRobot_EC10 ec;
+
+
 void setup() {
   Serial.begin(9600);
   Serial1.begin(115200);
@@ -40,7 +47,6 @@ void setup() {
   Serial.print("Attempting to start AP ");
   Serial.println(ssid);
 
-
   IPAddress localIp(192, 168, 8, 14);  // create an IP address
   WiFi.configAP(localIp);              // set the IP address of the AP
 
@@ -49,15 +55,27 @@ void setup() {
   // last comma is encryption type
   WiFi.beginAP(ssid, 11, password, ENC_TYPE_WPA2_PSK);
 
-
   Serial.print("Access point started");
-
 
   // Start the server
   server.begin();
   ec.begin();
   dht.begin();
   ph.begin();
+
+
+    for (int i = 4; i <= 7; i++)
+     {
+    pinMode(i, OUTPUT);
+    togglePin(i);
+      }
+
+  // turning on equipment that should be on by default
+  togglePin(LED_PIN);
+  togglePin(FAN_PIN);
+  togglePin(PUMP_PIN);
+  togglePin(EXTRACTOR_PIN);
+
   Serial.println("Server started");
 }
 
@@ -77,12 +95,6 @@ void loop() {
         // you got two newline characters in a row
         // that's the end of the HTTP request, so send a response
         if (buf.endsWith("\r\n\r\n")) {
-          sendHttpResponse(client, message);
-          break;
-        }
-
-        //Appending to URL returns the data
-        if (buf.endsWith("/M")) {
           float temperature = dht.readTemperature();
           float humidity = dht.readHumidity();
           float lightLevel = getLightLevel();
@@ -90,12 +102,46 @@ void loop() {
           float ecLevel = getEC(temperature);
           float phLevel = getPH(temperature);
 
-          message = "[\n {\n  \"PH\": \"" + String(phLevel) + "\",\n \"Light Sensor\": \"" + String(lightLevel) + "\",\n  \"EC\": \"" + String(ecLevel) + "\",\n  \"Humidity\": \"" + String(humidity) + "\",\n  \"Temperature\": \"" + String(temperature) + "\"\n }\n]\n\n";
+          //message = "[\n {\n  \"PH\": \"" + String(phLevel) + "\",\n \"Light Sensor\": \"" + String(lightLevel) +  "\",\n  \"EC\": \"" + String(ecLevel) + "\",\n  \"Humidity\": \"" + String(humidity) + "\",\n  \"Temperature\": \"" + String(temperature) +  "\"\n }\n]\n\n"; 
+          message = "[\n {\n  \"PH\": \"" + String(10) + "\",\n \"Light\": \"" + String(20) +  "\",\n  \"EC\": \"" + String(30) + "\",\n  \"Humidity\": \"" + String(40) + "\",\n  \"Temperature\": \"" + String(50) +  "\"\n }\n]\n\n"; 
           ec.calibration(ecLevel,temperature); 
+
+          sendHttpResponse(client, message);
+          break;
         }
 
+        //Appending to URL returns the data
+       /* if (buf.endsWith("/getSensorData")) {
+          float temperature = dht.readTemperature();
+          float humidity = dht.readHumidity();
+          float lightLevel = getLightLevel();
+
+          float ecLevel = getEC(temperature);
+          float phLevel = getPH(temperature);
+
+          message = "[\n {\n  \"PH\": \"" + String(phLevel) + "\",\n \"Light Sensor\": \"" + String(lightLevel) +  "\",\n  \"EC\": \"" + String(ecLevel) + "\",\n  \"Humidity\": \"" + String(humidity) + "\",\n  \"Temperature\": \"" + String(temperature) +  "\"\n }\n]\n\n"; 
+
+          ec.calibration(ecLevel,temperature); 
+        } */
+
         //Toggles LED
-        if (buf.endsWith("/T")) {
+        if (buf.endsWith("/light")) {
+          togglePin(LED_PIN);
+        } 
+
+         //Toggles LED
+        if (buf.endsWith("/fan")) {
+          togglePin(FAN_PIN);
+        } 
+
+         //Toggles LED
+        if (buf.endsWith("/extractor")) {
+          togglePin(EXTRACTOR_PIN);
+        } 
+
+         //Toggles LED
+        if (buf.endsWith("/pump")) {
+          togglePin(PUMP_PIN);
         } 
       }
     }
