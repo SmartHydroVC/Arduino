@@ -11,6 +11,15 @@ char ssid[] = "SmartHydro";       // newtork SSID (name). 8 or more characters
 char password[] = "Password123";  // network password. 8 or more characters
 String message = "";
 
+#include "EC.h"
+#include "pH.h"
+#include "Humidity.h"
+#include "Temperature.h"
+Eloquent::ML::Port::RandomForestEC ForestEC;
+Eloquent::ML::Port::RandomForestpH ForestPH;
+Eloquent::ML::Port::RandomForestHumidity ForestHumidity;
+Eloquent::ML::Port::RandomForestTemperature ForestTemperature;
+
 WiFiEspServer server(80);
 RingBuffer buf(8);
 
@@ -188,4 +197,16 @@ float getEC(float temperature) {
 float getPH(float temperature) {
   float phVoltage = analogRead(PH_PIN)/1024.0*5000; 
   return ph.readPH(phVoltage, temperature);
+}
+
+estimateTemperature(float temperature) {
+  int result = ForestTemperature.predict(&temperature);
+  int lightStatus = digitalRead(FAN_PIN);
+
+  switch(result) {
+    case 0: 
+      if (lightStatus == 1) togglePin(FAN_PIN);
+    case 1:
+      if (lightStatus == 0) togglePin(FAN_PIN);
+  }
 }
