@@ -126,20 +126,6 @@ void loop() {
           break;
         }
 
-        //Appending to URL returns the data
-       /* if (buf.endsWith("/getSensorData")) {
-          float temperature = dht.readTemperature();
-          float humidity = dht.readHumidity();
-          float lightLevel = getLightLevel();
-
-          float ecLevel = getEC(temperature);
-          float phLevel = getPH(temperature);
-
-          message = "[\n {\n  \"PH\": \"" + String(phLevel) + "\",\n \"Light Sensor\": \"" + String(lightLevel) +  "\",\n  \"EC\": \"" + String(ecLevel) + "\",\n  \"Humidity\": \"" + String(humidity) + "\",\n  \"Temperature\": \"" + String(temperature) +  "\"\n }\n]\n\n"; 
-
-          ec.calibration(ecLevel,temperature); 
-        } */
-
         //Toggles LED
         if (buf.endsWith("/light")) {
           togglePin(LED_PIN);
@@ -188,7 +174,6 @@ void sendHttpResponse(WiFiEspClient client, String message) {
   }
 }
 
-
 //Need assistance to confirm if calculations are correct.
 float getLightLevel() {
   return analogRead(LIGHT_PIN);
@@ -210,7 +195,7 @@ void estimateTemperature(float temperature) {
   int lightStatus = digitalRead(LIGHT_PIN);
 
   switch(result) {
-    case 0: 
+    case 0: //HIGH
       if (fanStatus == 1) togglePin(FAN_PIN);
       if (lightStatus == 1) togglePin(LIGHT_PIN);
       
