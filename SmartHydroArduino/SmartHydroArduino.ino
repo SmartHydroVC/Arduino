@@ -154,7 +154,7 @@ void loop() {
           togglePin(EC_UP_PIN);
         }
 
-        if (buf.endsWith("ecDown")) {
+        if (buf.endsWith("/ecDown")) {
           togglePin(EC_DOWN_PIN);
         }
       }
