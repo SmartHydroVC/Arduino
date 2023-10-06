@@ -33,6 +33,10 @@ RingBuffer buf(8);
 #define FAN_PIN 5
 #define PUMP_PIN 6
 #define EXTRACTOR_PIN 7
+#define PH_UP_PIN 8
+#define PH_DOWN_PIN 9
+#define EC_UP_PIN 10
+#define EC_DOWN_PIN 11
 
 
 DFRobot_PH ph;
@@ -92,6 +96,16 @@ void setup() {
 void loop() {
   WiFiEspClient client = server.available();  // Check if a client has connected
 
+  float temperature = dht.readTemperature();
+  float humidity = dht.readHumidity();
+  float lightLevel = getLightLevel();
+  float ecLevel = getEC(temperature);
+  float phLevel = getPH(temperature);
+
+  estimateEC(ecLevel);
+  estimatePH(phLevel);
+  estimateTemperature(temperature);
+  estimateHumidity(humidity);
 
   if (client) {  // If a client is available
     buf.init();
@@ -104,14 +118,6 @@ void loop() {
         // you got two newline characters in a row
         // that's the end of the HTTP request, so send a response
         if (buf.endsWith("\r\n\r\n")) {
-          float temperature = dht.readTemperature();
-          float humidity = dht.readHumidity();
-          float lightLevel = getLightLevel();
-
-          float ecLevel = getEC(temperature);
-          float phLevel = getPH(temperature);
-
-
           message = "{\n  \"PH\": \"" + String(phLevel) + "\",\n \"Light\": \"" + String(lightLevel) +  "\",\n  \"EC\": \"" + String(ecLevel) + "\",\n  \"Humidity\": \"" + String(humidity) + "\",\n  \"Temperature\": \"" + String(temperature) +  "\"\n }"; 
           //message = "[\n {\n  \"PH\": \"" + String(10) + "\",\n \"Light\": \"" + String(20) +  "\",\n  \"EC\": \"" + String(30) + "\",\n  \"Humidity\": \"" + String(40) + "\",\n  \"Temperature\": \"" + String(50) +  "\"\n }\n]\n\n"; 
           ec.calibration(ecLevel,temperature); 
@@ -167,7 +173,6 @@ void loop() {
 void togglePin(int pin) {
   digitalWrite(pin, !(digitalRead(pin)));
 }
-
   /**
   * Sends a http response along with a message.
   */
@@ -199,14 +204,76 @@ float getPH(float temperature) {
   return ph.readPH(phVoltage, temperature);
 }
 
-estimateTemperature(float temperature) {
+void estimateTemperature(float temperature) {
   int result = ForestTemperature.predict(&temperature);
-  int lightStatus = digitalRead(FAN_PIN);
+  int fanStatus = digitalRead(FAN_PIN);
+  int lightStatus = digitalRead(LIGHT_PIN);
 
   switch(result) {
     case 0: 
-      if (lightStatus == 1) togglePin(FAN_PIN);
+      if (fanStatus == 1) togglePin(FAN_PIN);
+      if (lightStatus == 1) togglePin(LIGHT_PIN);
+      
     case 1:
-      if (lightStatus == 0) togglePin(FAN_PIN);
+      if (fanStatus == 0) togglePin(FAN_PIN)
+      if (lightStatus == 0) togglePin(LIGHT_PIN);
   }
 }
+
+void estimateHumidity(float humidity) {
+  int result = ForestHumidity.predict(&humidity);
+  int extractorStatus = digitalRead(EXTRACTOR_PIN);
+  int fanStatus = digitalRead(FAN_PIN);
+
+  switch(result) {
+    case 0: 
+      if (extractorStatus == 1) togglePin(EXTRACTOR_PIN);
+      if (fanStatus == 1) togglePin(FAN_PIN);
+    
+    case 1:
+      if (extractorStatus == 0) togglePin(EXTRACTOR_PIN);
+      if (fanStatus == 0) togglePin(FAN_PIN);
+  }
+}
+
+void estimatePH(float ph) {
+  int result = ForestPH.predict(&ph);
+  int phUpStatus = digitalRead(PH_UP_PIN);
+  int phDownStatus = digitalRead(PH_DOWN_PIN);
+
+  switch (result) {
+    case 0:
+      if (phDownStatus == 0) togglePin(PH_DOWN_PIN);
+      if (phUpStatus == 1) togglePin(PH_UP_PIN);
+    
+    case 1:
+      if (phDownStatus == 1) togglePin(PH_DOWN_PIN)
+      if (phUpStatus == 0) togglePin(PH_UP_PIN);
+    
+    case 2:
+      if (phDownStatus == 1) togglePin(PH_DOWN_PIN);
+      if (phUpStatus == 1) togglePin(PH_UP_PIN);
+  }
+}
+
+void estimateEC(float ec) {
+  int result = ForestEC.predict(&ec);
+  int ecUpStatus = digitalRead(EC_UP_PIN);
+  int ecDownStatus = digitalRead(EC_DOWN_PIN);
+
+  switch (result) {
+    case 0:
+      if (ecDownStatus == 0) togglePin(EC_DOWN_PIN);
+      if (ecUpStatus == 1) togglePin(EC_UP_PIN);
+    
+    case 1:
+      if (ecDownStatus == 1) togglePin(EC_DOWN_PIN);
+      if (ecUpStatus == 0) togglePin(EC_UP_PIN);
+    
+    case 2:
+      if (ecUpStatus == 1) togglePin(EC_UP_PIN);
+      if (ecDownStatus == 1) togglePin(EC_DOWN_PIN);
+  }
+}
+
+
