@@ -126,25 +126,37 @@ void loop() {
           break;
         }
 
-        //Toggles LED
         if (buf.endsWith("/light")) {
           togglePin(LED_PIN);
         } 
 
-         //Toggles LED
         if (buf.endsWith("/fan")) {
           togglePin(FAN_PIN);
         } 
 
-         //Toggles LED
         if (buf.endsWith("/extractor")) {
           togglePin(EXTRACTOR_PIN);
         } 
 
-         //Toggles LED
         if (buf.endsWith("/pump")) {
           togglePin(PUMP_PIN);
         } 
+
+        if (buf.endsWith("/phUp")) {
+          togglePin(PH_UP_PIN);
+        }
+
+        if (buf.endsWith("/phDown")) {
+          togglePin(PH_DOWN_PIN);
+        }
+
+        if (buf.endsWith("/ecUp")) {
+          togglePin(EC_UP_PIN);
+        }
+
+        if (buf.endsWith("ecDown")) {
+          togglePin(EC_DOWN_PIN);
+        }
       }
     }
     Serial.println("Client disconnected");
