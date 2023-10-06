@@ -200,7 +200,7 @@ void estimateTemperature(float temperature) {
       if (lightStatus == 1) togglePin(LIGHT_PIN);
       
     case 1:
-      if (fanStatus == 0) togglePin(FAN_PIN)
+      if (fanStatus == 0) togglePin(FAN_PIN);
       if (lightStatus == 0) togglePin(LIGHT_PIN);
   }
 }
@@ -232,7 +232,7 @@ void estimatePH(float ph) {
       if (phUpStatus == 1) togglePin(PH_UP_PIN);
     
     case 1:
-      if (phDownStatus == 1) togglePin(PH_DOWN_PIN)
+      if (phDownStatus == 1) togglePin(PH_DOWN_PIN);
       if (phUpStatus == 0) togglePin(PH_UP_PIN);
     
     case 2:
