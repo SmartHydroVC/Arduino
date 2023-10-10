@@ -24,7 +24,7 @@ Eloquent::ML::Port::RandomForestTemperature ForestTemperature;
 WiFiEspServer server(80);
 RingBuffer buf(8);
 
-#define FLOW_PIN A3
+#define FLOW_PIN 2
 #define LIGHT_PIN A7
 #define EC_PIN A8
 #define PH_PIN A9
@@ -50,6 +50,9 @@ float humidity;
 float ecLevel;
 float phLevel;
 float lightLevel;
+float flowRate;
+volatile int pulseCount = 0;
+unsigned long currentTime, previousTime;
 
 void setup() {
   Serial.begin(9600);
@@ -82,6 +85,11 @@ void setup() {
   dht.begin();
   ph.begin();
 
+  pinMode(FLOW_PIN, INPUT);
+  currentTime = millis();
+  previousTime = 0;
+
+  attachInterrupt(digitalPinToInterrupt(FLOW_PIN), incrementPulseCounter, RISING);
 
     for (int i = 4; i <= 12; i++)
      {
@@ -110,6 +118,7 @@ void loop() {
   lightLevel = getLightLevel();
   ecLevel = getEC();
   phLevel = getPH();
+  flowRate = getFlowRate();
 
   timer.tick();
 
@@ -124,7 +133,7 @@ void loop() {
         // you got two newline characters in a row
         // that's the end of the HTTP request, so send a response
         if (buf.endsWith("\r\n\r\n")) {
-          message = "{\n  \"PH\": \"" + String(phLevel) + "\",\n \"Light\": \"" + String(lightLevel) +  "\",\n  \"EC\": \"" + String(ecLevel) + "\",\n  \"Humidity\": \"" + String(humidity) + "\",\n  \"Temperature\": \"" + String(temperature) +  "\"\n }"; 
+          message = "{\n  \"PH\": \"" + String(phLevel) + "\",\n \"Light\": \"" + String(lightLevel) +  "\",\n  \"EC\": \"" + String(ecLevel) + "\",\n  \"FlowRate\": \"" + String(flowRate) + "\",\n  \"Humidity\": \"" + String(humidity) + "\",\n  \"Temperature\": \"" + String(temperature) +  "\"\n }"; 
           ec.calibration(ecLevel, temperature); 
 
           sendHttpResponse(client, message);
@@ -187,6 +196,7 @@ void sendHttpResponse(WiFiEspClient client, String message) {
 
   if (message.length() > 0) {
     client.print("Content-Length:" + String(message.length()) + "\r\n\r\n");
+    Serial.print(message.length());
     client.print(message);
   }
 }
@@ -284,6 +294,22 @@ void estimateFactors() {
   estimateTemperature();
   estimateHumidity();
   estimateEC( );
+}
+
+void incrementPulseCounter() {
+  pulseCount++;
+}
+
+float getFlowRate() {
+  float calibratorFactor = 6.6;
+  if ((millis()) - previousTime > 1000) {
+    detachInterrupt(20);
+    float flowRateSensor = ((1000.0 / (millis() - previousTime)) * pulseCount) / calibratorFactor;
+    previousTime = millis();
+    pulseCount = 0;
+    Serial.print("FLOW RATE: " + String(flowRateSensor));
+    return flowRateSensor;
+  }
 }
 
 
