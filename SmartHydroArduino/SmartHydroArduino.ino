@@ -52,7 +52,7 @@ float phLevel;
 float lightLevel;
 float flowRate;
 volatile int pulseCount = 0;
-unsigned long currentTime, previousTime;
+unsigned long currentTime, cloopTime;
 
 void setup() {
   Serial.begin(9600);
@@ -86,10 +86,9 @@ void setup() {
   ph.begin();
 
   pinMode(FLOW_PIN, INPUT);
-  currentTime = millis();
-  previousTime = 0;
 
-  attachInterrupt(digitalPinToInterrupt(FLOW_PIN), incrementPulseCounter, RISING);
+   attachInterrupt(0, incrementPulseCounter, RISING);
+   sei();
 
     for (int i = 4; i <= 12; i++)
      {
@@ -301,14 +300,14 @@ void incrementPulseCounter() {
 }
 
 float getFlowRate() {
-  float calibratorFactor = 6.6;
-  if ((millis()) - previousTime > 1000) {
-    detachInterrupt(20);
-    float flowRateSensor = ((1000.0 / (millis() - previousTime)) * pulseCount) / calibratorFactor;
-    previousTime = millis();
+  currentTime = millis();
+
+  if (currentTime >= (cloopTime + 1000)) {
+    cloopTime = currentTime;
+    float flowRatePerHr = (pulseCount * 60 / 7.5);
     pulseCount = 0;
-    Serial.print("FLOW RATE: " + String(flowRateSensor));
-    return flowRateSensor;
+    Serial.println(flowRatePerHr);
+    return flowRatePerHr;
   }
 }
 
