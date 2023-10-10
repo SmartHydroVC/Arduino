@@ -5,6 +5,7 @@
 #include <DHT.h>
 #include "DFRobot_PH.h"
 #include "DFRobot_EC10.h"
+#include <arduino-timer.h>
 
 // WiFi network settings
 char ssid[] = "SmartHydro";       // newtork SSID (name). 8 or more characters
@@ -23,33 +24,34 @@ Eloquent::ML::Port::RandomForestTemperature ForestTemperature;
 WiFiEspServer server(80);
 RingBuffer buf(8);
 
-#define LIGHT_PIN A7
-#define DHT_PIN 8
-#define PH_PIN A9
-#define EC_PIN A8
 #define FLOW_PIN A3
+#define LIGHT_PIN A7
+#define EC_PIN A8
+#define PH_PIN A9
 #define DHTTYPE DHT22
 #define LED_PIN 4
 #define FAN_PIN 5
 #define PUMP_PIN 6
-#define EXTRACTOR_PIN 7
-#define PH_UP_PIN 8
-#define PH_DOWN_PIN 9
-#define EC_UP_PIN 10
-#define EC_DOWN_PIN 11
+#define EXTRACTOR_PIN 7  
+#define DHT_PIN 8
+#define PH_UP_PIN 9
+#define PH_DOWN_PIN 10
+#define EC_UP_PIN 11
+#define EC_DOWN_PIN 12
 
 
 DFRobot_PH ph;
 DHT dht = DHT(DHT_PIN, DHTTYPE);
 
 DFRobot_EC10 ec;
-
+auto timer = timer_create_default();
+float temperature;
 
 void setup() {
   Serial.begin(9600);
   Serial1.begin(115200);
   WiFi.init(&Serial1);  // Initialize ESP module using Serial1
-
+  
   // Check for the presence of the ESP module
   if (WiFi.status() == WL_NO_SHIELD) {
     Serial.println("WiFi module not detected. Please check wiring and power.");
@@ -77,11 +79,13 @@ void setup() {
   ph.begin();
 
 
-    for (int i = 4; i <= 7; i++)
+    for (int i = 4; i <= 12; i++)
      {
-    pinMode(i, OUTPUT);
-    togglePin(i);
+      if (i != 8) {
+        pinMode(i, OUTPUT);
+        togglePin(i);
       }
+     }
 
   // turning on equipment that should be on by default
   togglePin(LED_PIN);
@@ -90,22 +94,20 @@ void setup() {
   togglePin(EXTRACTOR_PIN);
 
   Serial.println("Server started");
+  timer.every(10000, estimateTemperature);
 }
 
 
 void loop() {
   WiFiEspClient client = server.available();  // Check if a client has connected
 
-  float temperature = dht.readTemperature();
+  temperature = dht.readTemperature();
   float humidity = dht.readHumidity();
   float lightLevel = getLightLevel();
   float ecLevel = getEC(temperature);
   float phLevel = getPH(temperature);
 
-  estimateEC(ecLevel);
-  estimatePH(phLevel);
-  estimateTemperature(temperature);
-  estimateHumidity(humidity);
+  timer.tick();
 
   if (client) {  // If a client is available
     buf.init();
@@ -119,7 +121,6 @@ void loop() {
         // that's the end of the HTTP request, so send a response
         if (buf.endsWith("\r\n\r\n")) {
           message = "{\n  \"PH\": \"" + String(phLevel) + "\",\n \"Light\": \"" + String(lightLevel) +  "\",\n  \"EC\": \"" + String(ecLevel) + "\",\n  \"Humidity\": \"" + String(humidity) + "\",\n  \"Temperature\": \"" + String(temperature) +  "\"\n }"; 
-          //message = "[\n {\n  \"PH\": \"" + String(10) + "\",\n \"Light\": \"" + String(20) +  "\",\n  \"EC\": \"" + String(30) + "\",\n  \"Humidity\": \"" + String(40) + "\",\n  \"Temperature\": \"" + String(50) +  "\"\n }\n]\n\n"; 
           ec.calibration(ecLevel,temperature); 
 
           sendHttpResponse(client, message);
@@ -205,6 +206,7 @@ void estimateTemperature(float temperature) {
   int result = ForestTemperature.predict(&temperature);
   int fanStatus = digitalRead(FAN_PIN);
   int lightStatus = digitalRead(LIGHT_PIN);
+  Serial.println(result);
 
   switch(result) {
     case 0: //HIGH
@@ -271,6 +273,13 @@ void estimateEC(float ec) {
       if (ecUpStatus == 1) togglePin(EC_UP_PIN);
       if (ecDownStatus == 1) togglePin(EC_DOWN_PIN);
   }
+}
+
+void estimateFactors(float ec, float ph, float temp, float humidity) {
+  estimatePH(ph);
+  estimateTemperature(temp);
+  estimateHumidity(humidity);
+  estimateEC(ec);
 }
 
 
