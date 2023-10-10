@@ -46,6 +46,10 @@ DHT dht = DHT(DHT_PIN, DHTTYPE);
 DFRobot_EC10 ec;
 auto timer = timer_create_default();
 float temperature;
+float humidity;
+float ecLevel;
+float phLevel;
+float lightLevel;
 
 void setup() {
   Serial.begin(9600);
@@ -102,10 +106,10 @@ void loop() {
   WiFiEspClient client = server.available();  // Check if a client has connected
 
   temperature = dht.readTemperature();
-  float humidity = dht.readHumidity();
-  float lightLevel = getLightLevel();
-  float ecLevel = getEC(temperature);
-  float phLevel = getPH(temperature);
+  humidity = dht.readHumidity();
+  lightLevel = getLightLevel();
+  ecLevel = getEC();
+  phLevel = getPH();
 
   timer.tick();
 
@@ -121,7 +125,7 @@ void loop() {
         // that's the end of the HTTP request, so send a response
         if (buf.endsWith("\r\n\r\n")) {
           message = "{\n  \"PH\": \"" + String(phLevel) + "\",\n \"Light\": \"" + String(lightLevel) +  "\",\n  \"EC\": \"" + String(ecLevel) + "\",\n  \"Humidity\": \"" + String(humidity) + "\",\n  \"Temperature\": \"" + String(temperature) +  "\"\n }"; 
-          ec.calibration(ecLevel,temperature); 
+          ec.calibration(ecLevel, temperature); 
 
           sendHttpResponse(client, message);
           break;
@@ -192,17 +196,17 @@ float getLightLevel() {
   return analogRead(LIGHT_PIN);
 }
 
-float getEC(float temperature) {
+float getEC() {
   float ecVoltage = (float)analogRead(EC_PIN)/1024.0*5000.0; 
-  return ec.readEC(ecVoltage,temperature);
+  return ec.readEC(ecVoltage, temperature);
 }
 
-float getPH(float temperature) {
+float getPH() {
   float phVoltage = analogRead(PH_PIN)/1024.0*5000; 
   return ph.readPH(phVoltage, temperature);
 }
 
-void estimateTemperature(float temperature) {
+void estimateTemperature() {
   int result = ForestTemperature.predict(&temperature);
   int fanStatus = digitalRead(FAN_PIN);
   int lightStatus = digitalRead(LIGHT_PIN);
@@ -219,7 +223,7 @@ void estimateTemperature(float temperature) {
   }
 }
 
-void estimateHumidity(float humidity) {
+void estimateHumidity() {
   int result = ForestHumidity.predict(&humidity);
   int extractorStatus = digitalRead(EXTRACTOR_PIN);
   int fanStatus = digitalRead(FAN_PIN);
@@ -235,8 +239,8 @@ void estimateHumidity(float humidity) {
   }
 }
 
-void estimatePH(float ph) {
-  int result = ForestPH.predict(&ph);
+void estimatePH() {
+  int result = ForestPH.predict(&phLevel);
   int phUpStatus = digitalRead(PH_UP_PIN);
   int phDownStatus = digitalRead(PH_DOWN_PIN);
 
@@ -255,8 +259,8 @@ void estimatePH(float ph) {
   }
 }
 
-void estimateEC(float ec) {
-  int result = ForestEC.predict(&ec);
+void estimateEC() {
+  int result = ForestEC.predict(&ecLevel);
   int ecUpStatus = digitalRead(EC_UP_PIN);
   int ecDownStatus = digitalRead(EC_DOWN_PIN);
 
@@ -275,11 +279,11 @@ void estimateEC(float ec) {
   }
 }
 
-void estimateFactors(float ec, float ph, float temp, float humidity) {
-  estimatePH(ph);
-  estimateTemperature(temp);
-  estimateHumidity(humidity);
-  estimateEC(ec);
+void estimateFactors() {
+  estimatePH();
+  estimateTemperature();
+  estimateHumidity();
+  estimateEC( );
 }
 
 
