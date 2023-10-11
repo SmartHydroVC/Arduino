@@ -155,20 +155,18 @@ void loop() {
           togglePin(PUMP_PIN);
         } 
 
-        if (buf.endsWith("/phUp")) {
-          togglePin(PH_UP_PIN);
+        if (buf.endsWith("/ph")) {
+          if (digitalRead(PH_DOWN_PIN) == 0 && digitalRead(PH_UP_PIN) == 0) togglePin(PH_UP_PIN);
+          if (digitalRead(PH_UP_PIN == 1) || digitalRead(PH_DOWN_PIN) == 1) togglePh();
         }
 
-        if (buf.endsWith("/phDown")) {
-          togglePin(PH_DOWN_PIN);
+        if (buf.endsWith("/ec")) {
+          if (digitalRead(EC_DOWN_PIN) == 0 && digitalRead(EC_UP_PIN) == 0) togglePin(EC_UP_PIN);
+          if (digitalRead(EC_UP_PIN == 1) || digitalRead(EC_DOWN_PIN == 1) toggleEc();
         }
 
-        if (buf.endsWith("/ecUp")) {
-          togglePin(EC_UP_PIN);
-        }
-
-        if (buf.endsWith("/ecDown")) {
-          togglePin(EC_DOWN_PIN);
+        if (buf.endsWith("/components")) {
+          message = "{\n  \"PHPump\": \"" + String(digitalRead(PH_UP_PIN)) + "\",\n \"Light\": \"" + String(digitalRead(LIGHT_PIN)) +  "\",\n  \"ECPump\": \"" + String(EC_UP_PIN) + "\",\n  \"WaterPump\": \"" + String(digitalRead(PUMP_PIN)) + "\",\n  \"Exctractor\": \"" + String(digitalRead(EXTRACTOR_PIN)) + "\",\n  \"Fan\": \"" + String(digitalRead(FAN_PIN)) +  "\"\n }"; 
         }
       }
     }
@@ -293,6 +291,16 @@ void estimateFactors() {
   estimateTemperature();
   estimateHumidity();
   estimateEC( );
+}
+
+void togglePh() {
+  togglePin(PH_UP_PIN);
+  togglePin(PH_DOWN_PIN);
+}
+
+void toggleEc() {
+  togglePin(EC_UP_PIN);
+  togglePin(EC_DOWN_PIN);
 }
 
 void incrementPulseCounter() {
