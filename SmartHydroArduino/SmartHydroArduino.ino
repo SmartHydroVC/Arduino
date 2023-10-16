@@ -29,8 +29,8 @@ RingBuffer buf(8);
 #define EC_PIN A8
 #define PH_PIN A9
 #define DHTTYPE DHT22
-#define LED_PIN 4
-#define FAN_PIN 5
+#define LED_PIN 3
+#define FAN_PIN 4
 #define PUMP_PIN 6
 #define EXTRACTOR_PIN 7  
 #define DHT_PIN 8
@@ -90,7 +90,7 @@ void setup() {
    attachInterrupt(0, incrementPulseCounter, RISING);
    sei();
 
-    for (int i = 4; i <= 12; i++)
+    for (int i = 3; i <= 12; i++)
      {
       if (i != 8) {
         pinMode(i, OUTPUT);
@@ -105,7 +105,8 @@ void setup() {
   togglePin(EXTRACTOR_PIN);
 
   Serial.println("Server started");
-  timer.every(10000, estimateTemperature);
+  timer.every(5000, estimateTemperature);
+  timer.every(5000, estimateHumidity);
 }
 
 
@@ -147,7 +148,7 @@ void loop() {
           togglePin(FAN_PIN);
         } 
 
-        if (buf.endsWith("/extractor")) {
+        if (buf.endsWith("/extract")) {
           togglePin(EXTRACTOR_PIN);
         } 
 
@@ -162,7 +163,7 @@ void loop() {
 
         if (buf.endsWith("/ec")) {
           if (digitalRead(EC_DOWN_PIN) == 0 && digitalRead(EC_UP_PIN) == 0) togglePin(EC_UP_PIN);
-          if (digitalRead(EC_UP_PIN == 1) || digitalRead(EC_DOWN_PIN == 1) toggleEc();
+          if (digitalRead(EC_UP_PIN == 1) || digitalRead(EC_DOWN_PIN) == 1) toggleEc();
         }
 
         if (buf.endsWith("/components")) {
@@ -219,14 +220,24 @@ void estimateTemperature() {
   int lightStatus = digitalRead(LIGHT_PIN);
   Serial.println(result);
 
-  switch(result) {
-    case 0: //HIGH
-      if (fanStatus == 1) togglePin(FAN_PIN);
-      if (lightStatus == 1) togglePin(LIGHT_PIN);
-      
-    case 1:
-      if (fanStatus == 0) togglePin(FAN_PIN);
-      if (lightStatus == 0) togglePin(LIGHT_PIN);
+  if (result == 0) {
+    if (fanStatus == 1){
+    digitalWrite(FAN_PIN, LOW);
+    Serial.println("FAN offfffff");
+    } 
+  }
+  else if (result == 1) {
+    if (fanStatus == 0){
+      digitalWrite(FAN_PIN, HIGH);
+      Serial.println("FAN ON");
+    } //togglePin(FAN_PIN);
+  }
+  else {
+     if (fanStatus == 0){
+      Serial.println("Fan: "+digitalRead(FAN_PIN));
+      togglePin(FAN_PIN);
+      Serial.println("FAN OFF!!!!!!!");    
+    }
   }
 }
 
@@ -235,14 +246,24 @@ void estimateHumidity() {
   int extractorStatus = digitalRead(EXTRACTOR_PIN);
   int fanStatus = digitalRead(FAN_PIN);
 
-  switch(result) {
-    case 0: 
-      if (extractorStatus == 1) togglePin(EXTRACTOR_PIN);
-      if (fanStatus == 1) togglePin(FAN_PIN);
-    
-    case 1:
-      if (extractorStatus == 0) togglePin(EXTRACTOR_PIN);
-      if (fanStatus == 0) togglePin(FAN_PIN);
+  if (result == 0) {
+    if (extractorStatus == 1){
+    digitalWrite(EXTRACTOR_PIN, LOW);
+    Serial.println("Ext offfffff");
+    } 
+  }
+  else if (result == 1) {
+    if (extractorStatus == 0){
+      digitalWrite(EXTRACTOR_PIN, HIGH);
+      Serial.println("Ext ON");
+    } //togglePin(FAN_PIN);
+  }
+  else {
+     if (extractorStatus == 0){
+      Serial.println("Ext: "+digitalRead(EXTRACTOR_PIN));
+      togglePin(EXTRACTOR_PIN);
+      Serial.println("Ext OFF!!!!!!!");    
+    }
   }
 }
 
