@@ -90,7 +90,7 @@ void setup() {
    attachInterrupt(0, incrementPulseCounter, RISING);
    sei();
 
-    for (int i = 3; i <= 12; i++)
+    for (int i = 3; i < 13; i++)
      {
       if (i != 8) {
         pinMode(i, OUTPUT);
@@ -107,6 +107,7 @@ void setup() {
   Serial.println("Server started");
   timer.every(5000, estimateTemperature);
   timer.every(5000, estimateHumidity);
+  timer.every(5000, estimateEC);
 }
 
 
@@ -156,15 +157,35 @@ void loop() {
           togglePin(PUMP_PIN);
         } 
 
-        if (buf.endsWith("/ph")) {
-          if (digitalRead(PH_DOWN_PIN) == 0 && digitalRead(PH_UP_PIN) == 0) togglePin(PH_UP_PIN);
-          if (digitalRead(PH_UP_PIN == 1) || digitalRead(PH_DOWN_PIN) == 1) togglePh();
+        if (buf.endsWith("/phUp")) {
+          togglePin(PH_DOWN_PIN, LOW);
+          togglePin(PH_UP_PIN);
         }
 
-        if (buf.endsWith("/ec")) {
-          if (digitalRead(EC_DOWN_PIN) == 0 && digitalRead(EC_UP_PIN) == 0) togglePin(EC_UP_PIN);
-          if (digitalRead(EC_UP_PIN == 1) || digitalRead(EC_DOWN_PIN) == 1) toggleEc();
+        if (buf.endsWith("/phDown")) {
+          togglePin(PH_UP_PIN, LOW);
+          togglePin(PH_DOWN_PIN);
         }
+
+        if (buf.endsWith("/ecUp")) {
+          togglePin(EC_DOWN_PIN, LOW);
+          togglePin(EC_UP_PIN, HIGH);
+        }
+
+        if (buf.endsWith("/ecDown")) {
+          togglePin(EC_UP_PIN, LOW);
+          togglePin(EC_DOWN_PIN, HIGH);
+        }
+
+        // if (buf.endsWith("/ph")) {
+        //   if (digitalRead(PH_DOWN_PIN) == 0 && digitalRead(PH_UP_PIN) == 0) togglePin(PH_UP_PIN);
+        //   if (digitalRead(PH_UP_PIN == 1) || digitalRead(PH_DOWN_PIN) == 1) togglePh();
+        // }
+
+        // if (buf.endsWith("/ec")) {
+        //   if (digitalRead(EC_DOWN_PIN) == 0 && digitalRead(EC_UP_PIN) == 0) togglePin(EC_UP_PIN);
+        //   if (digitalRead(EC_UP_PIN == 1) || digitalRead(EC_DOWN_PIN) == 1) toggleEc();
+        // } 
 
         if (buf.endsWith("/components")) {
           message = "{\n  \"PHPump\": \"" + String(digitalRead(PH_UP_PIN)) + "\",\n \"Light\": \"" + String(digitalRead(LIGHT_PIN)) +  "\",\n  \"ECPump\": \"" + String(EC_UP_PIN) + "\",\n  \"WaterPump\": \"" + String(digitalRead(PUMP_PIN)) + "\",\n  \"Exctractor\": \"" + String(digitalRead(EXTRACTOR_PIN)) + "\",\n  \"Fan\": \"" + String(digitalRead(FAN_PIN)) +  "\"\n }"; 
@@ -183,6 +204,11 @@ void loop() {
 void togglePin(int pin) {
   digitalWrite(pin, !(digitalRead(pin)));
 }
+
+void togglePin(int pin, int toggleValue) {
+  digitalWrite(pin, toggleValue);
+}
+
   /**
   * Sends a http response along with a message.
   */
@@ -214,57 +240,70 @@ float getPH() {
   return ph.readPH(phVoltage, temperature);
 }
 
+void setComponent(int result, int pin, int status){
+    if (result == 0) { // Below Optimal
+    if (status == 1){
+    digitalWrite(pin, LOW);
+    //Serial.println("FAN offfffff");
+    } 
+  }
+  else if (result == 1) { // Above Optimal
+    if (status == 0){
+      digitalWrite(pin, HIGH);
+      //Serial.println("FAN ON");
+    } 
+  }
+  else {
+     if (status == 0){ //Optimal 
+      Serial.println("Component: "+digitalRead(pin));
+      togglePin(pin);
+      //Serial.println("COMPONENT OFF!!!!!!!");    
+    }
+  }
+}
+
+void setPump(int result, int pinUp,int pinDown, int statusUp,int statusDown){
+    if (result == 0) { //Below Optimal
+    if (statusUp == 1 || statusDown == 0){
+    digitalWrite(pinUp, LOW);
+    digitalWrite(pinDown, HIGH);
+    Serial.println("pump up offfffff");
+    } 
+  }
+  else if (result == 1) { //Above Optimal
+    if (statusUp == 0 || statusDown == 1){
+      digitalWrite(pinUp, HIGH);
+      digitalWrite(pinDown, LOW);
+      Serial.println("pump down on");
+    } 
+  }
+  else {
+     
+      Serial.println("Component: "+digitalRead(pinUp));
+      Serial.println("Component: "+digitalRead(pinDown));
+      
+      togglePin(pinUp, HIGH);
+      togglePin(pinDown, HIGH);
+      Serial.println("COMPONENTS OFF!!!!!!!");    
+    
+  }
+}
+
 void estimateTemperature() {
   int result = ForestTemperature.predict(&temperature);
   int fanStatus = digitalRead(FAN_PIN);
   int lightStatus = digitalRead(LIGHT_PIN);
   Serial.println(result);
 
-  if (result == 0) {
-    if (fanStatus == 1){
-    digitalWrite(FAN_PIN, LOW);
-    Serial.println("FAN offfffff");
-    } 
-  }
-  else if (result == 1) {
-    if (fanStatus == 0){
-      digitalWrite(FAN_PIN, HIGH);
-      Serial.println("FAN ON");
-    } //togglePin(FAN_PIN);
-  }
-  else {
-     if (fanStatus == 0){
-      Serial.println("Fan: "+digitalRead(FAN_PIN));
-      togglePin(FAN_PIN);
-      Serial.println("FAN OFF!!!!!!!");    
-    }
-  }
+  setComponent(result,FAN_PIN,fanStatus);
 }
 
 void estimateHumidity() {
   int result = ForestHumidity.predict(&humidity);
   int extractorStatus = digitalRead(EXTRACTOR_PIN);
-  int fanStatus = digitalRead(FAN_PIN);
 
-  if (result == 0) {
-    if (extractorStatus == 1){
-    digitalWrite(EXTRACTOR_PIN, LOW);
-    Serial.println("Ext offfffff");
-    } 
-  }
-  else if (result == 1) {
-    if (extractorStatus == 0){
-      digitalWrite(EXTRACTOR_PIN, HIGH);
-      Serial.println("Ext ON");
-    } //togglePin(FAN_PIN);
-  }
-  else {
-     if (extractorStatus == 0){
-      Serial.println("Ext: "+digitalRead(EXTRACTOR_PIN));
-      togglePin(EXTRACTOR_PIN);
-      Serial.println("Ext OFF!!!!!!!");    
-    }
-  }
+
+  setComponent(result, EXTRACTOR_PIN, extractorStatus);
 }
 
 void estimatePH() {
@@ -292,19 +331,20 @@ void estimateEC() {
   int ecUpStatus = digitalRead(EC_UP_PIN);
   int ecDownStatus = digitalRead(EC_DOWN_PIN);
 
-  switch (result) {
-    case 0:
-      if (ecDownStatus == 0) togglePin(EC_DOWN_PIN);
-      if (ecUpStatus == 1) togglePin(EC_UP_PIN);
+  setPump(result, EC_UP_PIN, EC_DOWN_PIN, ecUpStatus, ecDownStatus);
+  // switch (result) {
+  //   case 0:
+  //     if (ecDownStatus == 0) togglePin(EC_DOWN_PIN);
+  //     if (ecUpStatus == 1) togglePin(EC_UP_PIN);
     
-    case 1:
-      if (ecDownStatus == 1) togglePin(EC_DOWN_PIN);
-      if (ecUpStatus == 0) togglePin(EC_UP_PIN);
+  //   case 1:
+  //     if (ecDownStatus == 1) togglePin(EC_DOWN_PIN);
+  //     if (ecUpStatus == 0) togglePin(EC_UP_PIN);
     
-    case 2:
-      if (ecUpStatus == 1) togglePin(EC_UP_PIN);
-      if (ecDownStatus == 1) togglePin(EC_DOWN_PIN);
-  }
+  //   case 2:
+  //     if (ecUpStatus == 1) togglePin(EC_UP_PIN);
+  //     if (ecDownStatus == 1) togglePin(EC_DOWN_PIN);
+  // }
 }
 
 void estimateFactors() {
