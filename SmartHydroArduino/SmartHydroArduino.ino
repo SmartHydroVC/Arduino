@@ -333,8 +333,9 @@ void disablePH() {
 }
 
 void disableEC() {
-  digitalWrite(EC_UP_PIN, LOW);
-  digitalWrite(EC_DOWN_PIN, LOW);
+  digitalWrite(EC_UP_PIN, HIGH);
+  digitalWrite(EC_DOWN_PIN, HIGH);
+  Serial.println("EC HIT");
 }
 
 void incrementPulseCounter() {
