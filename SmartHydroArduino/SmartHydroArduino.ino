@@ -223,7 +223,6 @@ void sendHttpResponse(WiFiEspClient client, String message) {
   }
 }
 
-//Need assistance to confirm if calculations are correct.
 float getLightLevel() {
   return analogRead(LIGHT_PIN);
 }
@@ -277,8 +276,8 @@ void setPump(int result, int pinUp, int pinDown, int statusUp,int statusDown){
   }
   else {
      
-      Serial.println("Component: "+ digitalRead(pinUp));
-      Serial.println("Component: "+ digitalRead(pinDown));
+      Serial.println("Component: " + digitalRead(pinUp));
+      Serial.println("Component: " + digitalRead(pinDown));
       
       togglePin(pinUp, HIGH);
       togglePin(pinDown, HIGH);
@@ -300,7 +299,6 @@ void estimateHumidity() {
   int result = ForestHumidity.predict(&humidity);
   int extractorStatus = digitalRead(EXTRACTOR_PIN);
 
-
   setComponent(result, EXTRACTOR_PIN, extractorStatus);
 }
 
@@ -309,19 +307,8 @@ void estimatePH() {
   int phUpStatus = digitalRead(PH_UP_PIN);
   int phDownStatus = digitalRead(PH_DOWN_PIN);
 
-  switch (result) {
-    case 0:
-      if (phDownStatus == 0) togglePin(PH_DOWN_PIN);
-      if (phUpStatus == 1) togglePin(PH_UP_PIN);
-    
-    case 1:
-      if (phDownStatus == 1) togglePin(PH_DOWN_PIN);
-      if (phUpStatus == 0) togglePin(PH_UP_PIN);
-    
-    case 2:
-      if (phDownStatus == 1) togglePin(PH_DOWN_PIN);
-      if (phUpStatus == 1) togglePin(PH_UP_PIN);
-  }
+  setPump(result, PH_UP_PIN, PH_DOWN_PIN, phUpStatus, phDownStatus);
+  timer.in(10000, disablePH);
 }
 
 void estimateEC() {
@@ -330,13 +317,14 @@ void estimateEC() {
   int ecDownStatus = digitalRead(EC_DOWN_PIN);
 
   setPump(result, EC_UP_PIN, EC_DOWN_PIN, ecUpStatus, ecDownStatus);
+  timer.in(10000, disableEC);
 }
 
 void estimateFactors() {
   estimatePH();
   estimateTemperature();
   estimateHumidity();
-  estimateEC( );
+  estimateEC();
 }
 
 void disablePH() {
