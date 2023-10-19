@@ -22,7 +22,7 @@ Eloquent::ML::Port::RandomForestHumidity ForestHumidity;
 Eloquent::ML::Port::RandomForestTemperature ForestTemperature;
 
 WiFiEspServer server(80);
-RingBuffer buf(8);
+RingBuffer buf(16);
 
 #define FLOW_PIN 2
 #define LIGHT_PIN A7
@@ -177,15 +177,13 @@ void loop() {
           togglePin(EC_DOWN_PIN, HIGH);
         }
 
-        // if (buf.endsWith("/ph")) {
-        //   if (digitalRead(PH_DOWN_PIN) == 0 && digitalRead(PH_UP_PIN) == 0) togglePin(PH_UP_PIN);
-        //   if (digitalRead(PH_UP_PIN == 1) || digitalRead(PH_DOWN_PIN) == 1) togglePh();
-        // }
+        if (buf.endsWith("/ph")) {
+          disablePH();
+        }
 
-        // if (buf.endsWith("/ec")) {
-        //   if (digitalRead(EC_DOWN_PIN) == 0 && digitalRead(EC_UP_PIN) == 0) togglePin(EC_UP_PIN);
-        //   if (digitalRead(EC_UP_PIN == 1) || digitalRead(EC_DOWN_PIN) == 1) toggleEc();
-        // } 
+        if (buf.endsWith("/ec")) {
+          disableEC();
+        }
 
         if (buf.endsWith("/components")) {
           message = "{\n  \"PHPump\": \"" + String(digitalRead(PH_UP_PIN)) + "\",\n \"Light\": \"" + String(digitalRead(LIGHT_PIN)) +  "\",\n  \"ECPump\": \"" + String(EC_UP_PIN) + "\",\n  \"WaterPump\": \"" + String(digitalRead(PUMP_PIN)) + "\",\n  \"Exctractor\": \"" + String(digitalRead(EXTRACTOR_PIN)) + "\",\n  \"Fan\": \"" + String(digitalRead(FAN_PIN)) +  "\"\n }"; 
@@ -255,14 +253,14 @@ void setComponent(int result, int pin, int status){
   }
   else {
      if (status == 0){ //Optimal 
-      Serial.println("Component: "+digitalRead(pin));
+      Serial.println("Component: "+ digitalRead(pin));
       togglePin(pin);
       //Serial.println("COMPONENT OFF!!!!!!!");    
     }
   }
 }
 
-void setPump(int result, int pinUp,int pinDown, int statusUp,int statusDown){
+void setPump(int result, int pinUp, int pinDown, int statusUp,int statusDown){
     if (result == 0) { //Below Optimal
     if (statusUp == 1 || statusDown == 0){
     digitalWrite(pinUp, LOW);
@@ -279,12 +277,12 @@ void setPump(int result, int pinUp,int pinDown, int statusUp,int statusDown){
   }
   else {
      
-      Serial.println("Component: "+digitalRead(pinUp));
-      Serial.println("Component: "+digitalRead(pinDown));
+      Serial.println("Component: "+ digitalRead(pinUp));
+      Serial.println("Component: "+ digitalRead(pinDown));
       
       togglePin(pinUp, HIGH);
       togglePin(pinDown, HIGH);
-      Serial.println("COMPONENTS OFF!!!!!!!");    
+      Serial.println("COMPONENTS OFF!");    
     
   }
 }
@@ -295,7 +293,7 @@ void estimateTemperature() {
   int lightStatus = digitalRead(LIGHT_PIN);
   Serial.println(result);
 
-  setComponent(result,FAN_PIN,fanStatus);
+  setComponent(result, FAN_PIN, fanStatus);
 }
 
 void estimateHumidity() {
@@ -332,19 +330,6 @@ void estimateEC() {
   int ecDownStatus = digitalRead(EC_DOWN_PIN);
 
   setPump(result, EC_UP_PIN, EC_DOWN_PIN, ecUpStatus, ecDownStatus);
-  // switch (result) {
-  //   case 0:
-  //     if (ecDownStatus == 0) togglePin(EC_DOWN_PIN);
-  //     if (ecUpStatus == 1) togglePin(EC_UP_PIN);
-    
-  //   case 1:
-  //     if (ecDownStatus == 1) togglePin(EC_DOWN_PIN);
-  //     if (ecUpStatus == 0) togglePin(EC_UP_PIN);
-    
-  //   case 2:
-  //     if (ecUpStatus == 1) togglePin(EC_UP_PIN);
-  //     if (ecDownStatus == 1) togglePin(EC_DOWN_PIN);
-  // }
 }
 
 void estimateFactors() {
@@ -354,14 +339,14 @@ void estimateFactors() {
   estimateEC( );
 }
 
-void togglePh() {
-  togglePin(PH_UP_PIN);
-  togglePin(PH_DOWN_PIN);
+void disablePH() {
+  digitalWrite(PH_UP_PIN, LOW);
+  digitalWrite(PH_DOWN_PIN, LOW);
 }
 
-void toggleEc() {
-  togglePin(EC_UP_PIN);
-  togglePin(EC_DOWN_PIN);
+void disableEC() {
+  digitalWrite(EC_UP_PIN, LOW);
+  digitalWrite(EC_DOWN_PIN, LOW);
 }
 
 void incrementPulseCounter() {
@@ -375,7 +360,6 @@ float getFlowRate() {
     cloopTime = currentTime;
     float flowRatePerHr = (pulseCount * 60 / 7.5);
     pulseCount = 0;
-    Serial.println(flowRatePerHr);
     return flowRatePerHr;
   }
 }
