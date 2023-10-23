@@ -8,7 +8,7 @@
 #include <arduino-timer.h>
 
 // WiFi network settings
-char ssid[] = "SmartHydro";       // newtork SSID (name). 8 or more characters
+char ssid[] = "SmartHydro1";       // newtork SSID (name). 8 or more characters
 char password[] = "Password123";  // network password. 8 or more characters
 String message = "";
 
@@ -107,7 +107,8 @@ void setup() {
   Serial.println("Server started");
   timer.every(5000, estimateTemperature);
   timer.every(5000, estimateHumidity);
-  timer.every(5000, estimateEC);
+  timer.every(600000, estimateEC);
+  timer.every(600000, estimatePH);
 }
 
 
@@ -287,37 +288,47 @@ void setPump(int result, int pinUp, int pinDown, int statusUp,int statusDown){
 }
 
 void estimateTemperature() {
-  int result = ForestTemperature.predict(&temperature);
-  int fanStatus = digitalRead(FAN_PIN);
-  int lightStatus = digitalRead(LIGHT_PIN);
-  Serial.println(result);
+  if(temperature != NAN){
+    int result = ForestTemperature.predict(&temperature);
+    int fanStatus = digitalRead(FAN_PIN);
+    int lightStatus = digitalRead(LIGHT_PIN);
+    Serial.println(result);
 
-  setComponent(result, FAN_PIN, fanStatus);
+    setComponent(result, FAN_PIN, fanStatus);
+  }
+  
 }
 
 void estimateHumidity() {
-  int result = ForestHumidity.predict(&humidity);
-  int extractorStatus = digitalRead(EXTRACTOR_PIN);
+  if(humidity != NAN){
+    int result = ForestHumidity.predict(&humidity);
+    int extractorStatus = digitalRead(EXTRACTOR_PIN);
 
-  setComponent(result, EXTRACTOR_PIN, extractorStatus);
+    setComponent(result, EXTRACTOR_PIN, extractorStatus);
+  }
 }
 
 void estimatePH() {
-  int result = ForestPH.predict(&phLevel);
-  int phUpStatus = digitalRead(PH_UP_PIN);
-  int phDownStatus = digitalRead(PH_DOWN_PIN);
+  if(phLevel != NAN){
+    int result = ForestPH.predict(&phLevel);
+    int phUpStatus = digitalRead(PH_UP_PIN);
+    int phDownStatus = digitalRead(PH_DOWN_PIN);
 
-  setPump(result, PH_UP_PIN, PH_DOWN_PIN, phUpStatus, phDownStatus);
-  timer.in(10000, disablePH);
+    setPump(result, PH_UP_PIN, PH_DOWN_PIN, phUpStatus, phDownStatus);
+    timer.in(5000, disablePH);
+  }
 }
 
 void estimateEC() {
-  int result = ForestEC.predict(&ecLevel);
-  int ecUpStatus = digitalRead(EC_UP_PIN);
-  int ecDownStatus = digitalRead(EC_DOWN_PIN);
+  if(ecLevel != NAN){
+    int result = ForestEC.predict(&ecLevel);
+    int ecUpStatus = digitalRead(EC_UP_PIN);
+    int ecDownStatus = digitalRead(EC_DOWN_PIN);
 
-  setPump(result, EC_UP_PIN, EC_DOWN_PIN, ecUpStatus, ecDownStatus);
-  timer.in(10000, disableEC);
+    setPump(result, EC_UP_PIN, EC_DOWN_PIN, ecUpStatus, ecDownStatus);
+    timer.in(5000, disableEC);
+  }
+  
 }
 
 void estimateFactors() {
