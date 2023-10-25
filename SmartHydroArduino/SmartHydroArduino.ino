@@ -48,7 +48,7 @@ DFRobot_PH ph;
 DHT dht = DHT(DHT_PIN, DHTTYPE);
 
 const unsigned long SIXTEEN_HR = 57600000;
-const unsigned long PUMP_INTERVAL = 10000;
+const unsigned long PUMP_INTERVAL = 5000;
 const unsigned long EIGHT_HR = 28800000;
 const unsigned long FOUR_HR = 14400000;
 
