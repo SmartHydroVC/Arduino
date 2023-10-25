@@ -7,6 +7,10 @@
 #include "DFRobot_EC10.h"
 #include <arduino-timer.h>
 
+//HIGH IS LOW 
+//LOW IS HIGH
+//WE DON'T KNOW EITHER
+
 // WiFi network settings
 char ssid[] = "SmartHydro1";       // newtork SSID (name). 8 or more characters
 char password[] = "Password123";  // network password. 8 or more characters
@@ -29,8 +33,8 @@ RingBuffer buf(16);
 #define EC_PIN A8
 #define PH_PIN A9
 #define DHTTYPE DHT22
-#define LED_PIN 3
-#define FAN_PIN 4
+#define LED_PIN 4
+#define FAN_PIN 5
 #define PUMP_PIN 6
 #define EXTRACTOR_PIN 7  
 #define DHT_PIN 8
@@ -42,6 +46,11 @@ RingBuffer buf(16);
 
 DFRobot_PH ph;
 DHT dht = DHT(DHT_PIN, DHTTYPE);
+
+const unsigned long SIXTEEN_HR = 57600000;
+const unsigned long PUMP_INTERVAL = 10000;
+const unsigned long EIGHT_HR = 28800000;
+const unsigned long FOUR_HR = 14400000;
 
 DFRobot_EC10 ec;
 auto timer = timer_create_default();
@@ -107,8 +116,10 @@ void setup() {
   Serial.println("Server started");
   timer.every(5000, estimateTemperature);
   timer.every(5000, estimateHumidity);
-  timer.every(600000, estimateEC);
-  timer.every(600000, estimatePH);
+  timer.every(SIXTEEN_HR, estimateEC);
+  timer.every(SIXTEEN_HR, estimatePH);
+
+  toggleLightOn(); 
 }
 
 
@@ -160,22 +171,26 @@ void loop() {
 
         if (buf.endsWith("/phUp")) {
           togglePin(PH_DOWN_PIN, LOW);
-          togglePin(PH_UP_PIN);
+          togglePin(PH_UP_PIN, HIGH);
+          timer.in(PUMP_INTERVAL, disablePH);
         }
 
         if (buf.endsWith("/phDown")) {
           togglePin(PH_UP_PIN, LOW);
-          togglePin(PH_DOWN_PIN);
+          togglePin(PH_DOWN_PIN, HIGH);
+          timer.in(PUMP_INTERVAL, disablePH);
         }
 
         if (buf.endsWith("/ecUp")) {
           togglePin(EC_DOWN_PIN, LOW);
           togglePin(EC_UP_PIN, HIGH);
+          timer.in(PUMP_INTERVAL, disableEC);
         }
 
         if (buf.endsWith("/ecDown")) {
           togglePin(EC_UP_PIN, LOW);
           togglePin(EC_DOWN_PIN, HIGH);
+          timer.in(PUMP_INTERVAL, disableEC);
         }
 
         if (buf.endsWith("/ph")) {
@@ -315,7 +330,7 @@ void estimatePH() {
     int phDownStatus = digitalRead(PH_DOWN_PIN);
 
     setPump(result, PH_UP_PIN, PH_DOWN_PIN, phUpStatus, phDownStatus);
-    timer.in(5000, disablePH);
+    timer.in(PUMP_INTERVAL, disablePH);
   }
 }
 
@@ -326,7 +341,7 @@ void estimateEC() {
     int ecDownStatus = digitalRead(EC_DOWN_PIN);
 
     setPump(result, EC_UP_PIN, EC_DOWN_PIN, ecUpStatus, ecDownStatus);
-    timer.in(5000, disableEC);
+    timer.in(PUMP_INTERVAL, disableEC);
   }
   
 }
@@ -339,8 +354,8 @@ void estimateFactors() {
 }
 
 void disablePH() {
-  digitalWrite(PH_UP_PIN, LOW);
-  digitalWrite(PH_DOWN_PIN, LOW);
+  digitalWrite(PH_UP_PIN, HIGH);
+  digitalWrite(PH_DOWN_PIN, HIGH);
 }
 
 void disableEC() {
@@ -363,5 +378,16 @@ float getFlowRate() {
     return flowRatePerHr;
   }
 }
+
+void toggleLightOn() {
+  togglePin(LED_PIN, LOW);
+  timer.in(EIGHT_HR, toggleLightOff);
+}
+
+void toggleLightOff() {
+  togglePin(LED_PIN, HIGH);
+  timer.in(FOUR_HR, toggleLightOn);
+}
+
 
 
