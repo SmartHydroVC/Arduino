@@ -7,8 +7,12 @@
 #include "DFRobot_EC10.h"
 #include <arduino-timer.h>
 
+//HIGH IS LOW 
+//LOW IS HIGH
+//WE DON'T KNOW EITHER
+
 // WiFi network settings
-char ssid[] = "SmartHydro";       // newtork SSID (name). 8 or more characters
+char ssid[] = "SmartHydro1";       // newtork SSID (name). 8 or more characters
 char password[] = "Password123";  // network password. 8 or more characters
 String message = "";
 
@@ -22,7 +26,7 @@ Eloquent::ML::Port::RandomForestHumidity ForestHumidity;
 Eloquent::ML::Port::RandomForestTemperature ForestTemperature;
 
 WiFiEspServer server(80);
-RingBuffer buf(8);
+RingBuffer buf(16);
 
 #define FLOW_PIN 2
 #define LIGHT_PIN A7
@@ -42,6 +46,11 @@ RingBuffer buf(8);
 
 DFRobot_PH ph;
 DHT dht = DHT(DHT_PIN, DHTTYPE);
+
+const unsigned long SIXTEEN_HR = 57600000;
+const unsigned long PUMP_INTERVAL = 5000;
+const unsigned long EIGHT_HR = 28800000;
+const unsigned long FOUR_HR = 14400000;
 
 DFRobot_EC10 ec;
 auto timer = timer_create_default();
@@ -90,7 +99,7 @@ void setup() {
    attachInterrupt(0, incrementPulseCounter, RISING);
    sei();
 
-    for (int i = 4; i <= 12; i++)
+    for (int i = 3; i < 13; i++)
      {
       if (i != 8) {
         pinMode(i, OUTPUT);
@@ -105,7 +114,12 @@ void setup() {
   togglePin(EXTRACTOR_PIN);
 
   Serial.println("Server started");
-  timer.every(10000, estimateTemperature);
+  timer.every(5000, estimateTemperature);
+  timer.every(5000, estimateHumidity);
+  timer.every(SIXTEEN_HR, estimateEC);
+  timer.every(SIXTEEN_HR, estimatePH);
+
+  toggleLightOn(); 
 }
 
 
@@ -147,7 +161,7 @@ void loop() {
           togglePin(FAN_PIN);
         } 
 
-        if (buf.endsWith("/extractor")) {
+        if (buf.endsWith("/extract")) {
           togglePin(EXTRACTOR_PIN);
         } 
 
@@ -155,14 +169,36 @@ void loop() {
           togglePin(PUMP_PIN);
         } 
 
+        if (buf.endsWith("/phUp")) {
+          togglePin(PH_DOWN_PIN, LOW);
+          togglePin(PH_UP_PIN, HIGH);
+          timer.in(PUMP_INTERVAL, disablePH);
+        }
+
+        if (buf.endsWith("/phDown")) {
+          togglePin(PH_UP_PIN, LOW);
+          togglePin(PH_DOWN_PIN, HIGH);
+          timer.in(PUMP_INTERVAL, disablePH);
+        }
+
+        if (buf.endsWith("/ecUp")) {
+          togglePin(EC_DOWN_PIN, LOW);
+          togglePin(EC_UP_PIN, HIGH);
+          timer.in(PUMP_INTERVAL, disableEC);
+        }
+
+        if (buf.endsWith("/ecDown")) {
+          togglePin(EC_UP_PIN, LOW);
+          togglePin(EC_DOWN_PIN, HIGH);
+          timer.in(PUMP_INTERVAL, disableEC);
+        }
+
         if (buf.endsWith("/ph")) {
-          if (digitalRead(PH_DOWN_PIN) == 0 && digitalRead(PH_UP_PIN) == 0) togglePin(PH_UP_PIN);
-          if (digitalRead(PH_UP_PIN == 1) || digitalRead(PH_DOWN_PIN) == 1) togglePh();
+          disablePH();
         }
 
         if (buf.endsWith("/ec")) {
-          if (digitalRead(EC_DOWN_PIN) == 0 && digitalRead(EC_UP_PIN) == 0) togglePin(EC_UP_PIN);
-          if (digitalRead(EC_UP_PIN == 1) || digitalRead(EC_DOWN_PIN == 1) toggleEc();
+          disableEC();
         }
 
         if (buf.endsWith("/components")) {
@@ -182,6 +218,11 @@ void loop() {
 void togglePin(int pin) {
   digitalWrite(pin, !(digitalRead(pin)));
 }
+
+void togglePin(int pin, int toggleValue) {
+  digitalWrite(pin, toggleValue);
+}
+
   /**
   * Sends a http response along with a message.
   */
@@ -198,7 +239,6 @@ void sendHttpResponse(WiFiEspClient client, String message) {
   }
 }
 
-//Need assistance to confirm if calculations are correct.
 float getLightLevel() {
   return analogRead(LIGHT_PIN);
 }
@@ -213,94 +253,115 @@ float getPH() {
   return ph.readPH(phVoltage, temperature);
 }
 
-void estimateTemperature() {
-  int result = ForestTemperature.predict(&temperature);
-  int fanStatus = digitalRead(FAN_PIN);
-  int lightStatus = digitalRead(LIGHT_PIN);
-  Serial.println(result);
-
-  switch(result) {
-    case 0: //HIGH
-      if (fanStatus == 1) togglePin(FAN_PIN);
-      if (lightStatus == 1) togglePin(LIGHT_PIN);
-      
-    case 1:
-      if (fanStatus == 0) togglePin(FAN_PIN);
-      if (lightStatus == 0) togglePin(LIGHT_PIN);
+void setComponent(int result, int pin, int status){
+    if (result == 0) { // Below Optimal
+    if (status == 1){
+    digitalWrite(pin, LOW);
+    //Serial.println("FAN offfffff");
+    } 
+  }
+  else if (result == 1) { // Above Optimal
+    if (status == 0){
+      digitalWrite(pin, HIGH);
+      //Serial.println("FAN ON");
+    } 
+  }
+  else {
+     if (status == 0){ //Optimal 
+      Serial.println("Component: "+ digitalRead(pin));
+      togglePin(pin);
+      //Serial.println("COMPONENT OFF!!!!!!!");    
+    }
   }
 }
 
-void estimateHumidity() {
-  int result = ForestHumidity.predict(&humidity);
-  int extractorStatus = digitalRead(EXTRACTOR_PIN);
-  int fanStatus = digitalRead(FAN_PIN);
-
-  switch(result) {
-    case 0: 
-      if (extractorStatus == 1) togglePin(EXTRACTOR_PIN);
-      if (fanStatus == 1) togglePin(FAN_PIN);
+void setPump(int result, int pinUp, int pinDown, int statusUp,int statusDown){
+    if (result == 0) { //Below Optimal
+    if (statusUp == 1 || statusDown == 0){
+    digitalWrite(pinUp, LOW);
+    digitalWrite(pinDown, HIGH);
+    Serial.println("pump up offfffff");
+    } 
+  }
+  else if (result == 1) { //Above Optimal
+    if (statusUp == 0 || statusDown == 1){
+      digitalWrite(pinUp, HIGH);
+      digitalWrite(pinDown, LOW);
+      Serial.println("pump down on");
+    } 
+  }
+  else {
+     
+      Serial.println("Component: " + digitalRead(pinUp));
+      Serial.println("Component: " + digitalRead(pinDown));
+      
+      togglePin(pinUp, HIGH);
+      togglePin(pinDown, HIGH);
+      Serial.println("COMPONENTS OFF!");    
     
-    case 1:
-      if (extractorStatus == 0) togglePin(EXTRACTOR_PIN);
-      if (fanStatus == 0) togglePin(FAN_PIN);
+  }
+}
+
+void estimateTemperature() {
+  if(temperature != NAN){
+    int result = ForestTemperature.predict(&temperature);
+    int fanStatus = digitalRead(FAN_PIN);
+    int lightStatus = digitalRead(LIGHT_PIN);
+    Serial.println(result);
+
+    setComponent(result, FAN_PIN, fanStatus);
+  }
+  
+}
+
+void estimateHumidity() {
+  if(humidity != NAN){
+    int result = ForestHumidity.predict(&humidity);
+    int extractorStatus = digitalRead(EXTRACTOR_PIN);
+
+    setComponent(result, EXTRACTOR_PIN, extractorStatus);
   }
 }
 
 void estimatePH() {
-  int result = ForestPH.predict(&phLevel);
-  int phUpStatus = digitalRead(PH_UP_PIN);
-  int phDownStatus = digitalRead(PH_DOWN_PIN);
+  if(phLevel != NAN){
+    int result = ForestPH.predict(&phLevel);
+    int phUpStatus = digitalRead(PH_UP_PIN);
+    int phDownStatus = digitalRead(PH_DOWN_PIN);
 
-  switch (result) {
-    case 0:
-      if (phDownStatus == 0) togglePin(PH_DOWN_PIN);
-      if (phUpStatus == 1) togglePin(PH_UP_PIN);
-    
-    case 1:
-      if (phDownStatus == 1) togglePin(PH_DOWN_PIN);
-      if (phUpStatus == 0) togglePin(PH_UP_PIN);
-    
-    case 2:
-      if (phDownStatus == 1) togglePin(PH_DOWN_PIN);
-      if (phUpStatus == 1) togglePin(PH_UP_PIN);
+    setPump(result, PH_UP_PIN, PH_DOWN_PIN, phUpStatus, phDownStatus);
+    timer.in(PUMP_INTERVAL, disablePH);
   }
 }
 
 void estimateEC() {
-  int result = ForestEC.predict(&ecLevel);
-  int ecUpStatus = digitalRead(EC_UP_PIN);
-  int ecDownStatus = digitalRead(EC_DOWN_PIN);
+  if(ecLevel != NAN){
+    int result = ForestEC.predict(&ecLevel);
+    int ecUpStatus = digitalRead(EC_UP_PIN);
+    int ecDownStatus = digitalRead(EC_DOWN_PIN);
 
-  switch (result) {
-    case 0:
-      if (ecDownStatus == 0) togglePin(EC_DOWN_PIN);
-      if (ecUpStatus == 1) togglePin(EC_UP_PIN);
-    
-    case 1:
-      if (ecDownStatus == 1) togglePin(EC_DOWN_PIN);
-      if (ecUpStatus == 0) togglePin(EC_UP_PIN);
-    
-    case 2:
-      if (ecUpStatus == 1) togglePin(EC_UP_PIN);
-      if (ecDownStatus == 1) togglePin(EC_DOWN_PIN);
+    setPump(result, EC_UP_PIN, EC_DOWN_PIN, ecUpStatus, ecDownStatus);
+    timer.in(PUMP_INTERVAL, disableEC);
   }
+  
 }
 
 void estimateFactors() {
   estimatePH();
   estimateTemperature();
   estimateHumidity();
-  estimateEC( );
+  estimateEC();
 }
 
-void togglePh() {
-  togglePin(PH_UP_PIN);
-  togglePin(PH_DOWN_PIN);
+void disablePH() {
+  digitalWrite(PH_UP_PIN, HIGH);
+  digitalWrite(PH_DOWN_PIN, HIGH);
 }
 
-void toggleEc() {
-  togglePin(EC_UP_PIN);
-  togglePin(EC_DOWN_PIN);
+void disableEC() {
+  digitalWrite(EC_UP_PIN, HIGH);
+  digitalWrite(EC_DOWN_PIN, HIGH);
+  Serial.println("EC HIT");
 }
 
 void incrementPulseCounter() {
@@ -314,9 +375,19 @@ float getFlowRate() {
     cloopTime = currentTime;
     float flowRatePerHr = (pulseCount * 60 / 7.5);
     pulseCount = 0;
-    Serial.println(flowRatePerHr);
     return flowRatePerHr;
   }
 }
+
+void toggleLightOn() {
+  togglePin(LED_PIN, LOW);
+  timer.in(EIGHT_HR, toggleLightOff);
+}
+
+void toggleLightOff() {
+  togglePin(LED_PIN, HIGH);
+  timer.in(FOUR_HR, toggleLightOn);
+}
+
 
 
